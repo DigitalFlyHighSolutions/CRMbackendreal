@@ -31,7 +31,7 @@ exports.signupUser = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = await Employee.create({ name, email, password: hashedPassword, role, department });
 
-    // ✉️ Plain text fallbacka
+    // ✉️ Plain text fallback
     const text = `Hello ${name},\n\nYou have been added to the CRM system.\nLogin Email: ${email}\nPassword: ${password}\n\nPlease login and update your password and mobile number.`;
 
     // 💅 HTML version

@@ -2,24 +2,14 @@ const nodemailer = require("nodemailer");
 const path = require("path");
 const fs = require("fs");
 
-// Create transporter
 const transporter = nodemailer.createTransport({
   host: process.env.MAIL_HOST, // e.g. smtp.hostinger.com
-  port: 465,                   // SSL
+  port: 465,                   // 587 (TLS) or 465 (SSL)
   secure: true,                // true for 465, false for 587
   auth: {
-    user: process.env.MAIL_USER,
-    pass: process.env.MAIL_PASS,
+    user: process.env.MAIL_USER, // full email address
+    pass: process.env.MAIL_PASS, // email password
   },
-});
-
-// Verify SMTP connection on startup
-transporter.verify((error, success) => {
-  if (error) {
-    console.error("❌ SMTP connection failed:", error);
-  } else {
-    console.log("✅ SMTP connection successful, ready to send emails");
-  }
 });
 
 const sendEmail = async (to, subject, text, html) => {
@@ -36,20 +26,21 @@ const sendEmail = async (to, subject, text, html) => {
       });
     }
 
-    const mailOptions = {
-      from: `"CRM Admin" <${process.env.MAIL_USER}>`,
+    await transporter.sendMail({
+      from: {
+        name: "CRM Admin",
+        address: process.env.MAIL_USER,
+      },
       to,
       subject,
-      text: text || "Please check your email client for HTML content.",
+      text,
       html,
       attachments,
-    };
+    });
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log("📨 Email sent:", info.messageId, "to", to);
+    console.log("📨 Email sent to", to);
   } catch (err) {
-    console.error("❌ Failed to send email:", err);
-    // Optional retry logic could go here
+    console.error("❌ Failed to send email:", err.message);
   }
 };
 
