@@ -43,7 +43,7 @@ router.post("/forgot", async (req, res) => {
 
     // Send email
     await transporter.sendMail({
-      from: `"Support | CRM" <${process.env.MAIL_FROM}>`,
+      from: `"Support | CRM" <${process.env.EMAIL_FROM}>`,
       to: user.email,
       subject: "🔒 Password Reset Request",
       html: `

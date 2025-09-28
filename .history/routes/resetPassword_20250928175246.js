@@ -36,14 +36,14 @@ router.post("/forgot", async (req, res) => {
       port: 465, // SSL
       secure: true, // true for port 465, false for 587
       auth: {
-        user: process.env.MAIL_USER, // your Hostinger email
-        pass: process.env.MAIL_PASS, // your Hostinger email password
+        user: process.env.EMAIL_USER, // your Hostinger email
+        pass: process.env.EMAIL_PASS, // your Hostinger email password
       },
     });
 
     // Send email
     await transporter.sendMail({
-      from: `"Support | CRM" <${process.env.MAIL_FROM}>`,
+      from: `"Support | CRM" <${process.env.EMAIL_FROM}>`,
       to: user.email,
       subject: "🔒 Password Reset Request",
       html: `
