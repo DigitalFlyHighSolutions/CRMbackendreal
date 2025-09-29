@@ -9,8 +9,7 @@ exports.markIn = async (req, res) => {
   const employeeId = req.user.id;
   const now = moment.tz(ZONE);
   const date = now.format("YYYY-MM-DD");
-  const loginTime = now.format("HH:mm:ss"); // display-only
-  const loginAt = now.toISOString();        // full timestamp for calc
+  const loginTime = now.format("HH:mm:ss"); // only saving time
 
   try {
     const existing = await Attendance.findOne({ employee: employeeId, date });
@@ -29,7 +28,6 @@ exports.markIn = async (req, res) => {
       email: employee.email,
       date,
       loginTime,
-      loginAt, // add this field to your schema (String)
     });
 
     await attendance.save();
@@ -43,13 +41,9 @@ exports.markIn = async (req, res) => {
 // POST /api/attendance/mark-out
 exports.markOut = async (req, res) => {
   const employeeId = req.user.id;
-
-  // ✅ Always use a safe string for timezone
-  const timezone = typeof ZONE === "string" ? ZONE : "Asia/Kolkata";
-
-  const now = moment.tz(timezone);
+  const now = moment.tz(ZONE);
   const date = now.format("YYYY-MM-DD");
-  const logoutAt = now; // full IST timestamp
+  const logoutTime = now.format("HH:mm:ss");
 
   try {
     const attendance = await Attendance.findOne({ employee: employeeId, date });
@@ -61,31 +55,32 @@ exports.markOut = async (req, res) => {
       return res.status(200).json({ msg: "Already marked out" });
     }
 
-    // Build login moment
-    const loginMoment = attendance.loginAt
-      ? moment.tz(attendance.loginAt, timezone)
-      : moment.tz(
-          `${attendance.date} ${attendance.loginTime}`,
-          "YYYY-MM-DD HH:mm:ss",
-          timezone,
-          true
-        );
+    // Build login + logout moment from stored strings
+    const loginMoment = moment.tz(
+      `${attendance.date} ${attendance.loginTime}`,
+      "YYYY-MM-DD HH:mm:ss",
+      ZONE
+    );
+    const logoutMoment = moment.tz(
+      `${date} ${logoutTime}`,
+      "YYYY-MM-DD HH:mm:ss",
+      ZONE
+    );
 
-    if (!loginMoment.isValid()) {
-      return res.status(400).json({ msg: "Invalid stored login time" });
+    if (!loginMoment.isValid() || !logoutMoment.isValid()) {
+      return res.status(400).json({ msg: "Invalid stored times" });
     }
 
-    // Compute duration precisely in minutes then convert to hours
-    const minutesWorked = logoutAt.diff(loginMoment, "minutes");
-    const hoursWorked = minutesWorked / 60;
+    const minutesWorked = logoutMoment.diff(loginMoment, "minutes");
+    const hoursWorked = (minutesWorked / 60).toFixed(2);
 
+    // Assign status
     let status = "Absent";
     if (hoursWorked >= 7.5) status = "Present";
     else if (hoursWorked >= 4) status = "Half Day";
 
-    attendance.logoutTime = logoutAt.format("HH:mm:ss"); // display
-    attendance.logoutAt = logoutAt.toISOString();        // save in DB
-    attendance.hoursWorked = hoursWorked.toFixed(2);
+    attendance.logoutTime = logoutTime;
+    attendance.hoursWorked = hoursWorked;
     attendance.status = status;
 
     await attendance.save();
@@ -93,8 +88,6 @@ exports.markOut = async (req, res) => {
     res.status(200).json({
       msg: "Logout time recorded (IST)",
       attendance,
-      status,
-      hoursWorked: hoursWorked.toFixed(2),
     });
   } catch (err) {
     console.error("Error marking out:", err);
@@ -102,13 +95,10 @@ exports.markOut = async (req, res) => {
   }
 };
 
-
 // GET /api/attendance/all (Admin only)
 exports.getAll = async (req, res) => {
   try {
-    // NOTE: Only keep the role filter if Attendance schema has a 'role' field.
-    const attendanceRecords = await Attendance.find({ /* role: { $ne: "admin" } */ })
-      .sort({ date: -1 });
+    const attendanceRecords = await Attendance.find().sort({ date: -1 });
     res.status(200).json(attendanceRecords);
   } catch (err) {
     console.error("Error fetching attendance:", err);
@@ -116,12 +106,10 @@ exports.getAll = async (req, res) => {
   }
 };
 
+// GET /api/attendance/my
 exports.getMyAttendance = async (req, res) => {
   try {
-    const records = await Attendance.find({
-      employee: req.user.id,
-      // role: { $ne: "admin" } // remove if role not on Attendance
-    }).sort({ date: 1 });
+    const records = await Attendance.find({ employee: req.user.id }).sort({ date: 1 });
     res.json(records);
   } catch (error) {
     res.status(500).json({ message: "Error fetching your attendance", error });
